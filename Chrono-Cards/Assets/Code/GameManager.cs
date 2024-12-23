@@ -1,48 +1,64 @@
-
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
+using System.Linq;
+using System.Diagnostics;
+using System;
 
 public class GameManager : MonoBehaviour
 {
-    public static GameManager Instance;
+    public static GameManager Instance { get; private set; }
+
+    [Header("Card Setup")]
     public GameObject cardPrefab;
     public Transform cardParent;
-    public int gridRows = 5;
-    public int gridCols = 5;
-    public int lives = 3;
+    public Sprite artifactSprite;
+    public Sprite trapSprite;
+    public Sprite healthSprite;
+    public Sprite backSprite;
+
+    [Header("Grid Settings")]
+    public int rows = 5;
+    public int cols = 5;
 
     private List<Card> cards = new List<Card>();
-    private List<CardFlip> revealedCards = new List<CardFlip>();
+    private CardFlip firstRevealedCard;
+    private CardFlip secondRevealedCard;
 
-    void Awake()
+    private void Awake()
     {
-        Instance = this;
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
     }
 
-    void Start()
+    private void Start()
     {
+        GenerateCardData();
         GenerateCards();
-        PlaceCards();
     }
 
-    void GenerateCards()
+    private void GenerateCardData()
     {
-        int totalCards = gridRows * gridCols;
+        int totalCards = rows * cols;
+
         int artifactCount = 12;
-        int trapCount = 7;
-        int healthCount = 6;
+        int trapCount = 10;
+        int healthCount = 3;
+
+        if (artifactCount + trapCount + healthCount != totalCards)
+        {
+            UnityEngine.Debug.LogError("Card type counts do not add up to total grid size.");
+            return;
+        }
 
         AddCards(Card.CardType.Artifact, artifactCount);
         AddCards(Card.CardType.Trap, trapCount);
         AddCards(Card.CardType.Health, healthCount);
 
-        cards = cards.OrderBy(x => UnityEngine.Random.value).ToList(); // Shuffle
+        // Shuffle cards
+        cards = cards.OrderBy(c => UnityEngine.Random.value).ToList();
     }
 
-    void AddCards(Card.CardType type, int count)
+    private void AddCards(Card.CardType type, int count)
     {
         for (int i = 0; i < count; i++)
         {
@@ -50,91 +66,76 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void PlaceCards()
+    private void GenerateCards()
     {
-        foreach (Card card in cards)
+        float spacing = 1.5f;
+
+        if (cards.Count != rows * cols)
         {
-            GameObject cardGO = Instantiate(cardPrefab, cardParent);
-            CardFlip cardFlip = cardGO.GetComponent<CardFlip>();
-            cardFlip.cardData = card;
-            cardFlip.UpdateCardVisual();
+            UnityEngine.Debug.LogError($"Mismatch between cards ({cards.Count}) and grid size ({rows * cols}).");
+            return;
         }
-    }
 
-    public void CardRevealed(CardFlip cardFlip)
-    {
-        revealedCards.Add(cardFlip);
-
-        if (revealedCards.Count == 2)
+        for (int y = 0; y < rows; y++)
         {
-            CheckForMatch();
-        }
-    }
-
-    void CheckForMatch()
-    {
-        CardFlip card1 = revealedCards[0];
-        CardFlip card2 = revealedCards[1];
-
-        if (card1.cardData.Type == card2.cardData.Type)
-        {
-            switch (card1.cardData.Type)
+            for (int x = 0; x < cols; x++)
             {
-                case Card.CardType.Trap:
-                    LoseLife();
-                    break;
-                case Card.CardType.Health:
-                    GainHealth();
-                    MarkCardsMatched(card1, card2);
-                    break;
-                default:
-                    MarkCardsMatched(card1, card2);
-                    break;
+                // Instantiate card prefab
+                GameObject cardGameObject = Instantiate(cardPrefab);
+                cardGameObject.transform.SetParent(cardParent, false);
+
+                // Position card in grid
+                cardGameObject.transform.localPosition = new Vector3(x * spacing, y * spacing, 0);
+
+                // Assign card data
+                int index = x + y * cols;
+                Card cardData = cards[index];
+                CardFlip cardFlip = cardGameObject.GetComponent<CardFlip>();
+                cardFlip.cardData = cardData;
+
+                // Assign sprites
+                cardFlip.artifactSprite = artifactSprite;
+                cardFlip.trapSprite = trapSprite;
+                cardFlip.healthSprite = healthSprite;
+                cardFlip.backSprite = backSprite;
+
+                // Update visuals to start with back face
+                cardFlip.UpdateCardVisual();
             }
+        }
+    }
+
+    public void CardRevealed(CardFlip card)
+    {
+        if (firstRevealedCard == null)
+        {
+            firstRevealedCard = card;
+        }
+        else if (secondRevealedCard == null)
+        {
+            secondRevealedCard = card;
+            StartCoroutine(CheckMatch());
+        }
+    }
+
+    private System.Collections.IEnumerator CheckMatch()
+    {
+        yield return new WaitForSeconds(1f);
+
+        if (firstRevealedCard.cardData.Type == secondRevealedCard.cardData.Type)
+        {
+            firstRevealedCard.cardData.IsMatched = true;
+            secondRevealedCard.cardData.IsMatched = true;
         }
         else
         {
-            StartCoroutine(FlipBackCards(card1, card2));
+            firstRevealedCard.cardData.IsFaceUp = false;
+            secondRevealedCard.cardData.IsFaceUp = false;
+            firstRevealedCard.UpdateCardVisual();
+            secondRevealedCard.UpdateCardVisual();
         }
 
-        revealedCards.Clear();
-    }
-
-    IEnumerator FlipBackCards(CardFlip card1, CardFlip card2)
-    {
-        yield return new WaitForSeconds(1f);
-        card1.cardData.IsFaceUp = false;
-        card2.cardData.IsFaceUp = false;
-        card1.UpdateCardVisual();
-        card2.UpdateCardVisual();
-    }
-
-    void MarkCardsMatched(CardFlip card1, CardFlip card2)
-    {
-        card1.cardData.IsMatched = true;
-        card2.cardData.IsMatched = true;
-    }
-
-    void GainHealth()
-    {
-        lives++;
-        Debug.Log("Health increased! Lives: " + lives);
-    }
-
-    void LoseLife()
-    {
-        lives--;
-        Debug.Log("Life lost! Lives: " + lives);
-
-        if (lives <= 0)
-        {
-            EndGame();
-        }
-    }
-
-    void EndGame()
-    {
-        Debug.Log("Game Over! The robot is stranded forever.");
-        // Implement game-over logic here
+        firstRevealedCard = null;
+        secondRevealedCard = null;
     }
 }
