@@ -221,7 +221,7 @@ MonoBehaviour:
   m_StartAxis: 0
   m_CellSize: {x: 150, y: 150}
   m_Spacing: {x: 10, y: 10}
-  m_Constraint: 1
+  m_Constraint: 2
   m_ConstraintCount: 5
 --- !u!1 &352357158
 GameObject:
@@ -322,9 +322,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardPrefab: {fileID: 3567383617856148495, guid: 97d624128f0711e42822ca60f5d3d2a8, type: 3}
   cardParent: {fileID: 1241882509}
-  gridRows: 5
-  gridCols: 5
-  lives: 3
+  artifactSprite: {fileID: 0}
+  trapSprite: {fileID: 0}
+  healthSprite: {fileID: 0}
+  backSprite: {fileID: 0}
+  rows: 5
+  cols: 5
 --- !u!4 &394548656
 Transform:
   m_ObjectHideFlags: 0
